@@ -1,0 +1,19 @@
+DBMS
+
+邮件表	Mail
+	收件人	     reference User.用户名
+	发件人	     reference User.用户名
+	发送时间     timestamp
+	标题 	 char[40]
+	正文内容    char[2000]	//最多字符量
+	文件（待定）	 blob
+	是否处于垃圾箱（待定）  bool	
+	收件人是否阅读                bool
+ 
+用户表  User
+	用户名	char[16]   unique
+	密码	char[16]   16 > length > 6
+	
+草稿箱（待定） Draft
+	用户名        reference User.用户名
+	正文内容      char[2000]
