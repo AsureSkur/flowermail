@@ -1,8 +1,9 @@
 DBMS
 
 邮件表	Mail
-	收件人	     reference User.用户名
-	发件人	     reference User.用户名
+	Mid	int primary key
+	收件人	     reference User.id
+	发件人	     reference User.id
 	发送时间     timestamp
 	标题 	 char[40]
 	正文内容    char[2000]	//最多字符量
@@ -11,6 +12,7 @@ DBMS
 	收件人是否阅读                bool
  
 用户表  User
+	id	int  primary key
 	用户名	char[16]   unique
 	密码	char[16]   16 > length > 6
 	
