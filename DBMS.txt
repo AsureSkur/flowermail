@@ -17,5 +17,5 @@ DBMS
 	密码	char[16]   16 > length > 6
 	
 草稿箱（待定） Draft
-	用户名        reference User.用户名
+	用户名        reference User.id
 	正文内容      char[2000]
