@@ -1,16 +1,36 @@
+//a function repeated wait for recv string from server
+int wait_for_recv(int client,char* recvbuf)
+{
+    int idatanum;
+    while(1)
+    {
+        recvbuf[0] = '\0';
+        idatanum = recv(client, recvbuf, 1024, 0);
+        if (idatanum < 0)
+        {
+            perror("recv null");
+            continue;
+        }
+        recvbuf[idatanum] = '\0';
+        printf("recv:%s\n",recvbuf);
+        break;
+    }
+    return 0;
+}
+
+
 //socket used for logining in, send username and password
 int socket_login(char username[200],char password[200])
 {
     //客户端只需要一个套接字文件描述符，用于和服务器通信
-    int clientSocket;
+    int client;
 
     //描述服务器的socket
     struct sockaddr_in serverAddr;
     char sendbuf[200];
     char recvbuf[200];
-    int iDataNum;
 
-    if ((clientSocket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+    if ((client = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("socket");
         return -1;
 
@@ -22,7 +42,7 @@ int socket_login(char username[200],char password[200])
     //指定服务器端的ip，本地测试：127.0.0.1
     //inet_addr()函数，将点分十进制IP转换成网络字节序IP
     serverAddr.sin_addr.s_addr = inet_addr(SERVER_ADDR);
-    if (connect(clientSocket, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0) {
+    if (connect(client, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0) {
 
         perror("connect");
 
@@ -35,18 +55,15 @@ int socket_login(char username[200],char password[200])
     //ask for login in, if get recv "ok", go next
     strcpy(sendbuf,"login");
     printf("send:%s\n",sendbuf);
-    send(clientSocket, sendbuf, strlen(sendbuf), 0);
+    send(client, sendbuf, strlen(sendbuf), 0);
 
-    recvbuf[0] = '\0';
-    iDataNum = recv(clientSocket, recvbuf, 200, 0);
-    recvbuf[iDataNum] = '\0';
-    printf("recv:%s\n",recvbuf);
+    wait_for_recv(client,recvbuf);
 
     if(strcmp(recvbuf,"okforlogin")!=0)
     {
         strcpy(sendbuf,CONNECT_CLOSE);
-        send(clientSocket, sendbuf, strlen(sendbuf), 0);
-        close(clientSocket);
+        send(client, sendbuf, strlen(sendbuf), 0);
+        close(client);
         printf("Login failed!\n");
         return 1;
     }
@@ -54,32 +71,28 @@ int socket_login(char username[200],char password[200])
     //send username, if username exists, go next
 
     strcpy(sendbuf,username);
-    send(clientSocket, sendbuf, strlen(sendbuf), 0);
+    send(client, sendbuf, strlen(sendbuf), 0);
 
-    recvbuf[0] = '\0';
-    iDataNum = recv(clientSocket, recvbuf, 200, 0);
-    recvbuf[iDataNum] = '\0';
-    printf("recv:%s\n",recvbuf);
+    wait_for_recv(client,recvbuf);
     if(strcmp(recvbuf,"userexists")!=0)
     {
         strcpy(sendbuf,CONNECT_CLOSE);
-        send(clientSocket, sendbuf, strlen(sendbuf), 0);
-        close(clientSocket);
+        send(client, sendbuf, strlen(sendbuf), 0);
+        close(client);
         printf("Username not exists!\n");
         return 2;
     }
 
     //send password, if password verified, go next
     strcpy(sendbuf,password);
-    send(clientSocket, sendbuf, strlen(sendbuf), 0);
-    recvbuf[0] = '\0';
-    iDataNum = recv(clientSocket, recvbuf, 200, 0);
-    recvbuf[iDataNum] = '\0';
+    send(client, sendbuf, strlen(sendbuf), 0);
+
+    wait_for_recv(client,recvbuf);
 
     //set return signal
     strcpy(sendbuf,CONNECT_CLOSE);
-    send(clientSocket, sendbuf, strlen(sendbuf), 0);
-    close(clientSocket);
+    send(client, sendbuf, strlen(sendbuf), 0);
+    close(client);
 
     if(strcmp(recvbuf,"passwordright")!=0)
     {
