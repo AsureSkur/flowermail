@@ -1,0 +1,143 @@
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+#define SERVER_PORT 6666
+/*
+连接到服务器后，会不停循环，等待输入，
+输入quit后，断开与服务器的连接
+*/
+
+int socket_login(char username[200],char password[200]);
+int socket_register(char username[200],char password[200]);
+int main()
+{
+    //printf("%d\n",socket_login("aaa","123"));
+    printf("%d\n",socket_register("bbb","123"));
+}
+//socket used for logining in, send username and password
+int socket_login(char username[200],char password[200])
+{
+    //客户端只需要一个套接字文件描述符，用于和服务器通信
+    int clientSocket;
+
+    //描述服务器的socket
+    struct sockaddr_in serverAddr;
+    char sendbuf[200];
+    char recvbuf[200];
+    int iDataNum;
+
+    if ((clientSocket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("socket");
+        return 1;
+
+    }
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(SERVER_PORT);
+
+    //指定服务器端的ip，本地测试：127.0.0.1
+    //inet_addr()函数，将点分十进制IP转换成网络字节序IP
+    serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    if (connect(clientSocket, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0) {
+
+        perror("connect");
+
+        return 1;
+
+    }
+
+    printf("连接到主机...\n");
+    strcpy(sendbuf,"login");
+    send(clientSocket, sendbuf, strlen(sendbuf), 0);
+    strcpy(sendbuf,username);
+    send(clientSocket, sendbuf, strlen(sendbuf), 0);
+    strcpy(sendbuf,password);
+    send(clientSocket, sendbuf, strlen(sendbuf), 0);
+    recvbuf[0] = '\0';
+    iDataNum = recv(clientSocket, recvbuf, 200, 0);
+    recvbuf[iDataNum] = '\0';
+    int flag=0;
+    //set return signal
+    if(strcmp(recvbuf,"right")!=0)
+    {
+        flag=1;
+    }
+    strcpy(sendbuf,"end");
+    send(clientSocket, sendbuf, strlen(sendbuf), 0);
+    close(clientSocket);
+    return flag;
+}
+
+//socket used for register, send username and password,
+//if username repeated show "repeated" and return 1,
+//if succeed return 0,
+//if something error, return -1;
+int socket_register(char username[200],char password[200])
+{
+    //客户端只需要一个套接字文件描述符，用于和服务器通信
+    int clientSocket;
+
+    //描述服务器的socket
+    struct sockaddr_in serverAddr;
+    char sendbuf[200];
+    char recvbuf[200];
+    int iDataNum;
+
+    if ((clientSocket = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+        perror("socket");
+        return 1;
+
+    }
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(SERVER_PORT);
+
+    //指定服务器端的ip，本地测试：127.0.0.1
+    //inet_addr()函数，将点分十进制IP转换成网络字节序IP
+    serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+    if (connect(clientSocket, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0) {
+
+        perror("connect");
+
+        return 1;
+
+    }
+
+    printf("连接到主机...\n");
+    strcpy(sendbuf,"register");
+    send(clientSocket, sendbuf, strlen(sendbuf), 0);
+    strcpy(sendbuf,username);
+    send(clientSocket, sendbuf, strlen(sendbuf), 0);
+    strcpy(sendbuf,password);
+    send(clientSocket, sendbuf, strlen(sendbuf), 0);
+
+    recvbuf[0] = '\0';
+    iDataNum = recv(clientSocket, recvbuf, 200, 0);
+    recvbuf[iDataNum] = '\0';
+    int flag=0;
+    //set return signal
+    printf("%s\n",recvbuf);
+    if(strcmp(recvbuf,"succeed")==0)
+    {
+        flag=0;
+    }
+    else if(strcmp(recvbuf,"repeat")==0)
+    {
+        flag=1;
+    }
+    else flag=-1;
+    strcpy(sendbuf,"end");
+    send(clientSocket, sendbuf, strlen(sendbuf), 0);
+    close(clientSocket);
+    return flag;
+}
