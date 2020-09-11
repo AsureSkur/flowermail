@@ -1,4 +1,5 @@
 //a function repeated wait for recv string from server
+int wait_for_recv(int client,char* recvbuf);
 int wait_for_recv(int client,char* recvbuf)
 {
     int idatanum;
