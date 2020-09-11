@@ -1,3 +1,4 @@
+//socket used for logining in, send username and password
 int socket_login(char username[200],char password[200])
 {
     //客户端只需要一个套接字文件描述符，用于和服务器通信
