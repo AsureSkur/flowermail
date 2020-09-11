@@ -5,16 +5,50 @@
 #include <QSqlQuery>
 #include <time.h>
 #include <string>
+/*
+    调用函数前需要创建一个db实例与query实例
+    调用函数时第一个参数为query实例
+    例子:
+    QSqlDatabase db = connect_dbms("flowermail", "root", "123456");
+    QSqlQuery query(db);
+
+    在完成某个操作之后需要进行数据库关闭
+    例子:
+    db.close();
+
+    建议在打开信箱之后将数据保存在全局变量中
+
+    宏、枚举、函数从 下方开始  均有注释说明功能
+    数据库具体表格类型在最结尾
+    更新时间：2020.9.11 16.41
+    
+    需要添加功能请在下面列出（谢谢各位大佬！！！）
+    
+    
+*/
+
+
+
+//数据库相关信息
+#define CONNECTION "QMYSQL"   //数据库连接类型
+//#define DBMS "flowermail"   //数据库名称
+//#define DBMS_USER "root"    //数据库用户
+//#define DBMS_PASSWD "123456"//数据库密码
+
+#define CHECKED 1   //返回信息
+#define CANT_FIND_USER 0   //找寻不到用户
+#define CANT_CHECK_PASSWORD 1 //密码不匹配
+#define ALREADY_EXIST -2    //用户已存在(用于注册判断)
 
 //表类型
 enum TableType {USER = 0, MAIL, DRAFT};
 //Mail中状态序列
-enum Status {ISINJUNKBIN = 0, ISREAD};
+enum Status {ISINJUNKBOX = 0, ISREAD};
 //数据库数据分割 列
 //Mail表的列名
 enum MailValue { MID = 0,
-                 MRECIPIENT,
-                 MSENDER,
+                 MRECIPIENTID,
+                 MSENDERID,
                  MSENDTIME,
                  MTITLE,
                  MTEXT,
@@ -35,21 +69,40 @@ enum DraftValue { DID = 0,
 //函数
     //连接操作
     QSqlDatabase connect_dbms(QString dbms, QString user,QString password);//数据库连接
+
     //数据插入操作
     void dbms_insert(QSqlQuery query, QString Uid, QString Uname, QString Upasswd);//数据插入表User
     void dbms_insert(QSqlQuery query, QString Mid, QString Mrecipientid,           //数据插入表Mail
                      QString Msenderid, QString Mtitle, QString Mtext,
                      QString Mfile, QString Misinjunkbox, QString Misread);
     void dbms_insert(QSqlQuery query, QString Did, QString Dtext);                 //数据插入表Draft
+
     //数据更新操作
         //疑似只需要进行：更新密码、更新草稿箱、更新是否在垃圾箱中、更新是否阅读
         //alter:更新内容  tabletype:表类型(0:User, 2:Draft)
-    void dbms_update(QSqlQuery query, QString alter, int tabletype);               //更新数据表(User,Draft)中的内容
+    void dbms_update(QSqlQuery query, QString Uid, QString alter, int tabletype);               //更新数据表(User,Draft)中的内容
         //seq:状态序列（0:IsInJunkbin, 1:IsRead）status:状态(T/F)
-    void dbms_update(QSqlQuery query, int seq, bool status );                      //更新邮件状态
+    void dbms_update(QSqlQuery query, QString Mid, int seq, bool status );                      //更新邮件状态
+
     //数据删除
+        //应该只有删邮件？？
         //type:表类型(0:User,1:Mail,2:Draft) condition:删除约束条件(sql语句中Where后面的部分)
-    void dbms_delete(QSqlQuery query, int tabletype, QString condition);           //删除数据表中的某个内容
+    void dbms_delete(QSqlQuery query, QString Mid, int tabletype);           //删除数据表中的某个内容
+
+    //数据查询
+    QString dbms_get_data_from_user(QSqlQuery query, int column, QString condition);//查询user表
+
+    QSqlQuery dbms_get_query_from_mail_recipientid(QSqlQuery query, QString recipient_id);//根据收件人获得信件信息（用于查看信箱）
+    QSqlQuery dbms_get_query_from_mail_senderid(QSqlQuery query, QString sender_id);//根据发件人获得信件信息（用于查看发送信件）
+
+    //获取注册人数
+    int dbms_get_user_number(QSqlQuery query);
+
+    //各种实际功能
+    int check_username(QSqlQuery query, QString username);                  //判断用户名是否存在
+    int check_password(QSqlQuery query, QString username, QString password);//判断密码与用户名是否匹配
+    int user_register (QSqlQuery query, QString username, QString password);//注册相关
+
 
 //
 
@@ -64,7 +117,7 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
         qDebug() << driver;
 
     // 打开MySQL
-    QSqlDatabase db = QSqlDatabase::addDatabase("QMYSQL");
+    QSqlDatabase db = QSqlDatabase::addDatabase(CONNECTION);
 
     //数据库的登陆
     db.setHostName("localhost");//登陆ip
@@ -76,7 +129,7 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
     if (!db.open())
         qDebug() << "Failed to connect to root mysql admin";
     else
-        qDebug() << "Succussfully Open";
+        qDebug() << "DBMS Succussfully Open";
 
     return db;
 }
@@ -89,6 +142,7 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
                            +"'" + Uname + "',"
                            +"'" + Upasswd + "')";
            //判断是否写入成功
+           qDebug() << "insert command:" << exec;
            if(query.exec(exec)) qDebug() << "Successfully insert data into User";
            else                 qDebug() << "Fail to insert data";
 
@@ -152,3 +206,206 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
         if(query.exec(exec)) qDebug() << "Successfully insert data into Draft";
         else                 qDebug() << "Fail to insert data";
     }
+
+    //alter:更新内容  tabletype:表类型(0:User, 2:Draft)
+    void dbms_update(QSqlQuery query, QString Uid, QString alter, int tabletype){               //更新数据表(User,Draft)中的内容
+
+        QString exec;
+
+        switch (tabletype){
+            case USER:
+                //组合命令 更新密码
+                exec = "update User set Upasswd = '"
+                     + alter + "' where Uid = " + Uid;
+                break;
+            case MAIL:
+                break;
+            case DRAFT:
+                //组合命令 更新草稿
+                exec = "update Draft set Dtext = '"
+                        + alter + "' where Did = " + Uid;
+                break;
+            default : break;
+        }
+
+        //log输出
+        if(query.exec(exec)) {
+            qDebug() << "Successfully update data";
+        }
+        else {
+            qDebug() << "Fail to update data";
+        }
+
+    }
+
+    //seq:状态序列（0:IsInJunkbox, 1:IsRead）status:状态(T/F)
+    void dbms_update(QSqlQuery query, QString Mid, int seq, bool status ){                    //更新邮件状态
+        QString exec;
+        QString sta;
+        if(status){
+            sta = "true";
+        }
+        else {
+            sta = "false";
+        }
+
+        switch (seq){
+            case ISINJUNKBOX:
+                exec = "update Mail set Misinjunkbox = "
+                     + sta + " where Mid = " + Mid;
+                if(status) {
+                    dbms_update(query, Mid, ISREAD, true);  //如果处于垃圾箱中, 则设置成 已读
+                }
+                break;
+            case ISREAD:
+                exec = "update Mail set Misread = "
+                     + sta + " where Mid = " + Mid;
+                break;
+            default: break;
+        }
+        //qDebug() << exec;
+        if(query.exec(exec)) qDebug() << "Successfully change mail status";
+        else                 qDebug() << "Fail to change mail status";
+    }
+
+    //数据删除
+        //应该只有删邮件？？
+        //type:表类型(0:User,1:Mail,2:Draft) condition:删除约束条件(sql语句中Where后面的部分)(应该只有Mid为条件)
+    void dbms_delete(QSqlQuery query, QString Mid, int tabletype){           //删除数据表中的某个内容
+            QString exec;
+            switch (tabletype) {
+                case USER:
+                    break;
+                case MAIL:
+                    exec = "delete from Mail where Mid = " + Mid;
+                    break;
+                case DRAFT:
+                    break;
+                default: break;
+            }
+
+            if(query.exec(exec)) qDebug() << "Successfully delete mail";
+            else                 qDebug() << "Fail to delete mail";
+        }
+
+    QString dbms_get_data_from_user(QSqlQuery query, int column, QString condition){       //查询user表
+
+        QString exec;
+        switch (column){
+            case UID:
+                exec = "select Uid from User where Uname = '" + condition + "'"; //查询uid匹配
+                break;
+            case UNAME:
+                exec = "select Uname from User where Uname = '" + condition + "'"; //查询用户名匹配
+                break;
+            case UPASSWORD:
+                exec = "select Upasswd from User where Uname = '" + condition + "'"; //查询密码匹配
+                break;
+            default:
+                break;
+        }
+        if(!query.exec(exec)) {
+            qDebug() << "Fail to get data";
+            return "";
+        }
+        else {
+            query.next();
+            QString data = query.value(0).toString();
+            qDebug() << "Successfully get data : " + data;
+            return data;
+        }
+    }
+
+    //查询Mail表
+    QSqlQuery dbms_get_query_from_mail_recipientid(QSqlQuery query, QString recipient_id){//根据收件人获得信件信息（用于查看信箱）
+        QString exec = "select * from Mail where Mrecipientid = " + recipient_id;
+        query.exec(exec);
+        return query;
+    }
+    QSqlQuery dbms_get_query_from_mail_senderid(QSqlQuery query, QString sender_id){    //根据发件人获得信件信息（用于查看发送信件）
+        QString exec = "select * from Mail where Msenderid = " + sender_id;
+        query.exec(exec);
+        return query;
+    }
+
+    //获取注册人数(以分配uid)
+    int dbms_get_user_number(QSqlQuery query){
+        QString exec = "select Uid from User";
+        query.exec(exec);
+        //人数
+        int num = 0;
+        while(query.next()){
+            num++;
+        }
+        qDebug() << "user number" << num;
+        return num;
+    }
+
+    //检测是否存在用户名
+    int check_username(QSqlQuery query, QString username){
+        QString data = dbms_get_data_from_user(query, UNAME, username);
+        if(data != NULL){
+            return CHECKED;
+        } else {
+            return CANT_FIND_USER;
+        }
+
+    }
+    //检测用户名是否和密码匹配(先检测用户名是否存在再检测密码是否匹配,因此不用判断是否存在账户)
+    int check_password(QSqlQuery query, QString username, QString password){
+        QString Upasswd = dbms_get_data_from_user(query, UPASSWORD, username);
+        if(Upasswd == password){
+            return CHECKED;
+        }
+        else {
+            return CANT_CHECK_PASSWORD;
+        }
+    }
+
+    int user_register(QSqlQuery query, QString username, QString password){//注册相关
+        int power_to_register = check_username(query, username);//是否能够注册
+        //不重名 则分配uid 并创建表
+        if (power_to_register == CANT_FIND_USER) {
+            int number = dbms_get_user_number(query);
+            dbms_insert(query, QString::number(number,10), username, password);
+            return CHECKED;
+        }
+        //重名  则返回已存在
+        else if (power_to_register == CHECKED){
+            return ALREADY_EXIST;
+        }
+    }
+/*mysql> desc User;
++---------+----------+------+-----+---------+-------+
+| Field   | Type     | Null | Key | Default | Extra |
++---------+----------+------+-----+---------+-------+
+| Uid     | int(11)  | NO   | PRI | NULL    |       |
+| Uname   | char(16) | YES  | UNI | NULL    |       |
+| Upasswd | char(16) | NO   |     | NULL    |       |
++---------+----------+------+-----+---------+-------+
+
+mysql> desc Mail;
++--------------+---------------+------+-----+---------+-------+
+| Field        | Type          | Null | Key | Default | Extra |
++--------------+---------------+------+-----+---------+-------+
+| Mid          | int(11)       | NO   | PRI | NULL    |       |
+| Mrecipientid | int(11)       | NO   | MUL | NULL    |       |
+| Msenderid    | int(11)       | NO   | MUL | NULL    |       |
+| Msendtime    | datetime      | NO   |     | NULL    |       |
+| Mtitle       | varchar(40)   | NO   |     | NULL    |       |
+| Mtext        | varchar(2000) | YES  |     | NULL    |       |
+| Mfile        | blob          | YES  |     | NULL    |       |
+| Misinjunkbox | tinyint(1)    | YES  |     | NULL    |       |
+| Misread      | tinyint(1)    | YES  |     | NULL    |       |
++--------------+---------------+------+-----+---------+-------+
+
+mysql> desc Draft;
++-------+---------------+------+-----+---------+-------+
+| Field | Type          | Null | Key | Default | Extra |
++-------+---------------+------+-----+---------+-------+
+| Did   | int(11)       | NO   | PRI | NULL    |       |
+| Dtext | varchar(2000) | YES  |     | NULL    |       |
++-------+---------------+------+-----+---------+-------+
+
+*/
+
