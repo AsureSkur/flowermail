@@ -15,6 +15,8 @@
 
 #define SERVER_PORT 6666
 #define CONNECT_CLOSE "end"
+#define DBMS_PWD "123456"
+
 /*
 监听后，一直处于accept阻塞状态，
 直到有客户端连接，
@@ -297,7 +299,7 @@ int register_process(int client)
 
 int check_username(char username[200]){
     //连接数据库
-    QSqlDatabase db = connect_dbms("flowermail", "root", "123456");
+    QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
     QSqlQuery query(db);
 
     int check_status = check_username(query,username);
@@ -308,7 +310,7 @@ int check_username(char username[200]){
 
 int check_password(char username[200],char password[200]){
     //连接数据库
-    QSqlDatabase db = connect_dbms("flowermail", "root", "123456");
+    QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
     QSqlQuery query(db);
 
     int check_status = check_password(query,username,password);
@@ -319,7 +321,7 @@ int check_password(char username[200],char password[200]){
 
 int user_register(char username[200],char password[200]){
     //连接数据库
-    QSqlDatabase db = connect_dbms("flowermail", "root", "123456");
+    QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
     QSqlQuery query(db);
 
     int check_status = user_register(query, username, password);
