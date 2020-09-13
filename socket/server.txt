@@ -23,14 +23,14 @@
 当客户端如数quit后，断开与客户端的连接
 */
 //check username in the database, if found return CHECKED, else if not found return CANT_FIND_USER,// else return -1
-int check_username(char username[200]);
+int check_username(char* username);
 
 //check whether the password matches the username, if match return CHECKED, else return CANT_MATCH_PASSWORD;
 //after using check_username(), use check_password()
-int check_password(char username[200],char password[200]);
+int check_password(char* username,char* password);
 
 //check register, if register succeed, return CHECKED, else return ALREADY_EXIST;
-int user_register(char username[200],char password[200]);
+int user_register(char* username,char* password);
 
 
 int wait_for_recv(int client,char* recvbuf);
@@ -297,7 +297,7 @@ int register_process(int client)
 }
 
 
-int check_username(char username[200]){
+int check_username(char* username){
     //连接数据库
     QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
     QSqlQuery query(db);
@@ -308,7 +308,7 @@ int check_username(char username[200]){
     return check_status;
 }
 
-int check_password(char username[200],char password[200]){
+int check_password(char* username,char* password){
     //连接数据库
     QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
     QSqlQuery query(db);
@@ -319,7 +319,7 @@ int check_password(char username[200],char password[200]){
     return check_status;
 }
 
-int user_register(char username[200],char password[200]){
+int user_register(char* username,char* password){
     //连接数据库
     QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
     QSqlQuery query(db);
