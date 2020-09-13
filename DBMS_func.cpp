@@ -43,7 +43,7 @@
            "Msendtime datetime not null,"
            "Mtitle varchar(40) not null,"
            "Mtext varchar(2000),"
-           "Mfile mediumblob,"
+           "Mfile varchar(50),"
            "Misinjunkbox bool,"
            "Misread bool,"
            "foreign key (Mrecipientid) references User(Uid),"
