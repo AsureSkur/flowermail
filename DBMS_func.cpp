@@ -19,15 +19,52 @@
     建议在打开信箱之后将数据保存在全局变量中
 
     宏、枚举、函数从 下方开始  均有注释说明功能
-    数据库具体表格类型在最结尾
-    更新时间：2020.9.11 16.41
-    
-    需要添加功能请在下面列出（谢谢各位大佬！！！）
-    
-    
 */
 
+//以下为数据库的创建
+//数据库需要先手动创建:create database flowermail;
+//创建用户名 完成
+   /* query.exec("create table User"
+           "("
+           "Uid int primary key,"
+           "Uname char(16) not null,"
+           "Upasswd char(16) not null"
+           ") ENGINE=InnoDB DEFAULT CHARSET=utf8"
+           "");*/
+    /*
+     * 手动补:alter table User modify column Uname char(16) unique;
+    */
+//创建邮件表 完成
+    /*query.exec("create table Mail"
+           "("
+           "Mid int primary key,"
+           "Mrecipientid int ,"
+           "Msenderid int ,"
+           "Msendtime datetime not null,"
+           "Mtitle varchar(40) not null,"
+           "Mtext varchar(2000),"
+           "Mfile blob,"
+           "Misinjunkbox bool,"
+           "Misread bool,"
+           "foreign key (Mrecipientid) references User(Uid),"
+           "foreign key (Msenderid) references User(Uid)"
+           ") ENGINE=InnoDB DEFAULT CHARSET=utf8"
+           "");*/
+    /*
+     * 手动补:alter table Mail modify column Mrecipientid int not null;
+     *      :alter table Mail modify column Msenderid int nut null;
+            */
+//创建草稿箱 完成
+    /*query.exec("create table Draft"
+           "("
+           "Did int,"
+           "Dtext varchar(2000),"
+           "foreign key (Did) references User(Uid)"
+           ") ENGINE=InnoDB DEFAULT CHARSET=utf8"
+           "");*/
 
+
+//以下为数据库相关宏、枚举、函数
 
 //数据库相关信息
 #define CONNECTION "QMYSQL"   //数据库连接类型
@@ -91,7 +128,7 @@ enum DraftValue { DID = 0,
 
     //数据查询
     QString dbms_get_data_from_user(QSqlQuery query, int column, QString condition);//查询user表
-
+        //查询后返回一个数据库表，需要使用 query.next() 与 query.value(int column) 得到字符串
     QSqlQuery dbms_get_query_from_mail_recipientid(QSqlQuery query, QString recipient_id);//根据收件人获得信件信息（用于查看信箱）
     QSqlQuery dbms_get_query_from_mail_senderid(QSqlQuery query, QString sender_id);//根据发件人获得信件信息（用于查看发送信件）
 
@@ -102,7 +139,8 @@ enum DraftValue { DID = 0,
     int check_username(QSqlQuery query, QString username);                  //判断用户名是否存在
     int check_password(QSqlQuery query, QString username, QString password);//判断密码与用户名是否匹配
     int user_register (QSqlQuery query, QString username, QString password);//注册相关
-
+    bool check_mail_in_junkbox(QSqlQuery query, QString Mid);               //根据邮件id判断是否在垃圾箱中
+    bool check_mail_read(QSqlQuery query, QString Mid);                     //根据邮件id判断是否被阅读
 
 //
 
@@ -328,6 +366,7 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
         return query;
     }
 
+
     //获取注册人数(以分配uid)
     int dbms_get_user_number(QSqlQuery query){
         QString exec = "select Uid from User";
@@ -375,37 +414,66 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
             return ALREADY_EXIST;
         }
     }
-/*mysql> desc User;
-+---------+----------+------+-----+---------+-------+
-| Field   | Type     | Null | Key | Default | Extra |
-+---------+----------+------+-----+---------+-------+
-| Uid     | int(11)  | NO   | PRI | NULL    |       |
-| Uname   | char(16) | YES  | UNI | NULL    |       |
-| Upasswd | char(16) | NO   |     | NULL    |       |
-+---------+----------+------+-----+---------+-------+
 
-mysql> desc Mail;
-+--------------+---------------+------+-----+---------+-------+
-| Field        | Type          | Null | Key | Default | Extra |
-+--------------+---------------+------+-----+---------+-------+
-| Mid          | int(11)       | NO   | PRI | NULL    |       |
-| Mrecipientid | int(11)       | NO   | MUL | NULL    |       |
-| Msenderid    | int(11)       | NO   | MUL | NULL    |       |
-| Msendtime    | datetime      | NO   |     | NULL    |       |
-| Mtitle       | varchar(40)   | NO   |     | NULL    |       |
-| Mtext        | varchar(2000) | YES  |     | NULL    |       |
-| Mfile        | blob          | YES  |     | NULL    |       |
-| Misinjunkbox | tinyint(1)    | YES  |     | NULL    |       |
-| Misread      | tinyint(1)    | YES  |     | NULL    |       |
-+--------------+---------------+------+-----+---------+-------+
+    bool check_mail_in_junkbox(QSqlQuery query, QString Mid){//根据邮件id判断邮件是否位于垃圾箱
+        QString exec = "select Misinjunkbox from Mail where Mid = " + Mid;
 
-mysql> desc Draft;
-+-------+---------------+------+-----+---------+-------+
-| Field | Type          | Null | Key | Default | Extra |
-+-------+---------------+------+-----+---------+-------+
-| Did   | int(11)       | NO   | PRI | NULL    |       |
-| Dtext | varchar(2000) | YES  |     | NULL    |       |
-+-------+---------------+------+-----+---------+-------+
+        if(!query.exec(exec)) return false;//如果无法处理
+        query.next();
+        if(query.value(0).toString() == "1"){
+                return true;
+        }
+        else if(query.value(0).toString() == "0"){
+            return false;
+        }
+        //无Mid会自动报error不用管
+    }
 
-*/
+    bool check_mail_read(QSqlQuery query, QString Mid){ //根据邮件id判断邮件是否被阅读
+        QString exec = "select Misread from Mail where Mid = " + Mid;
 
+        if(!query.exec(exec)) return false;//如果无法处理
+        query.next();
+        if(query.value(0).toString() == "1"){
+            return true;
+        }
+        else if (query.value(0).toString() == "0"){
+            return false;
+        }
+        //无Mid会自动报error不用管
+    }
+
+
+    /*
+     * 数据库各表列类型
+     *
+     * mysql> desc User;
+    +---------+----------+------+-----+---------+-------+
+    | Field   | Type     | Null | Key | Default | Extra |
+    +---------+----------+------+-----+---------+-------+
+    | Uid     | int(11)  | NO   | PRI | NULL    |       |
+    | Uname   | char(16) | NO   | UNI | NULL    |       |
+    | Upasswd | char(16) | NO   |     | NULL    |       |
+    +---------+----------+------+-----+---------+-------+
+    mysql> desc Mail;
+    +--------------+---------------+------+-----+---------+-------+
+    | Field        | Type          | Null | Key | Default | Extra |
+    +--------------+---------------+------+-----+---------+-------+
+    | Mid          | int(11)       | NO   | PRI | NULL    |       |
+    | Mrecipientid | int(11)       | NO   | MUL | NULL    |       |
+    | Msenderid    | int(11)       | NO   | MUL | NULL    |       |
+    | Msendtime    | datetime      | NO   |     | NULL    |       |
+    | Mtitle       | varchar(40)   | NO   |     | NULL    |       |
+    | Mtext        | varchar(2000) | YES  |     | NULL    |       |
+    | Mfile        | blob          | YES  |     | NULL    |       |
+    | Misinjunkbox | tinyint(1)    | YES  |     | NULL    |       |
+    | Misread      | tinyint(1)    | YES  |     | NULL    |       |
+    +--------------+---------------+------+-----+---------+-------+
+    mysql> desc Draft;
+    +-------+---------------+------+-----+---------+-------+
+    | Field | Type          | Null | Key | Default | Extra |
+    +-------+---------------+------+-----+---------+-------+
+    | Did   | int(11)       | NO   | PRI | NULL    |       |
+    | Dtext | varchar(2000) | YES  |     | NULL    |       |
+    +-------+---------------+------+-----+---------+-------+
+    */
