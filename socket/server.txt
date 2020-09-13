@@ -32,6 +32,8 @@ int check_password(char* username,char* password);
 //check register, if register succeed, return CHECKED, else return ALREADY_EXIST;
 int user_register(char* username,char* password);
 
+//upload mail to SQL, if upload succeed, return CHECKED, else return CANT_FIND_USER;
+int upload_mail(char* sendername, char* receivername, char* title, char* text);
 
 int wait_for_recv(int client,char* recvbuf);
 
@@ -325,6 +327,17 @@ int user_register(char* username,char* password){
     QSqlQuery query(db);
 
     int check_status = user_register(query, username, password);
+    db.close();
+
+    return check_status;
+}
+
+int upload_mail(char* sendername, char* receivername, char* title, char* text){
+      //连接数据库
+    QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
+    QSqlQuery query(db);
+
+    int check_status = send_mail(query, receivername,sendername, title, text);
     db.close();
 
     return check_status;
