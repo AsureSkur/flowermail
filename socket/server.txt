@@ -35,6 +35,7 @@ int upload_mail(char* sendername, char* receivername, char* title, char* text);
 
 //get the mailnum, mailtitle, sendername in the user's mailbox, return vector;
 std::vector<std::string> get_maillist(char* username);
+std::string get_mailtext(char* mailid);
 
 int wait_for_recv(int client,char* recvbuf);
 char* int_to_string(int num);
