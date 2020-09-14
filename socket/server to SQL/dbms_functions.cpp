@@ -157,8 +157,9 @@ enum DraftValue { DID = 0,
     int  update_file_address(QSqlQuery query, QString Mid);                  //根据邮件id更改文件地址（插入时文件地址为null，如果有文件进行更新）
     void create_new_folder(QString storage, QString Mid);                   //传入存储地址与Mid，在该目录下创建一个文件夹
 
-    std::vector<std::string> get_mail_and_sender_by_receiver(QSqlQuery query,QSqlQuery tempquery, QString receiverid);  //获取收件人下 邮件id 邮件名 发件人名称
-
+    std::vector<std::string> get_mail_and_sender_by_receiver        //获取收件人下 邮件id 邮件名 发件人名称
+        (QSqlQuery query,QSqlQuery tempquery, QString receiverid);
+    QString get_mail_text_by_mid(QSqlQuery query, QString Mid); //根据Mid获取信件正文
 //
 
 
@@ -538,6 +539,14 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
             vec.push_back(returnback.toStdString());
         }
         return vec;
+    }
+
+    QString get_mail_text_by_mid(QSqlQuery query, QString Mid){ //根据Mid获取信件正文
+        QString exec = "select Mtext from Mail where Mid = " + Mid;
+        query.exec(exec);
+
+        query.next();
+        return query.value(0).toString();
     }
 
     /*
