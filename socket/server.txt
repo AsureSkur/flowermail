@@ -10,6 +10,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include<vector>
 //数据库相关头文件
 #include <dbms_functions.cpp>
 
@@ -17,11 +18,8 @@
 #define CONNECT_CLOSE "end"
 #define DBMS_PWD "123456"
 
-/*
-监听后，一直处于accept阻塞状态，
-直到有客户端连接，
-当客户端如数quit后，断开与客户端的连接
-*/
+//using namespace std;
+
 //check username in the database, if found return CHECKED, else if not found return CANT_FIND_USER,// else return -1
 int check_username(char* username);
 
@@ -35,13 +33,19 @@ int user_register(char* username,char* password);
 //upload mail to SQL, if upload succeed, return CHECKED, else return CANT_FIND_USER;
 int upload_mail(char* sendername, char* receivername, char* title, char* text);
 
+//return the mailnum in the user's mailbox, return int>=0, if error return -1;
+std::vector<std::string> get_maillist(char* username);
+
 int wait_for_recv(int client,char* recvbuf);
+char* int_to_string(int num);
 
 //a function for login check;
 int login_process(int client);
 int register_process(int client);
+int recvlist_process(int client);
 
 int socket_server();
+
 int main()
 {
     socket_server();
@@ -68,6 +72,25 @@ int wait_for_recv(int client,char* recvbuf)
     return 0;
 }
 
+void int_to_string(char*str,int num)
+{
+    char* p = str;
+    int mod = 1;
+    while (mod <= num)
+    {
+        mod *= 10;
+    }
+    mod = mod / 10;
+    while (mod >= 1)
+    {
+        *p = '0' + num / mod % 10;
+        p++;
+        *p = '\0';
+        mod = mod / 10;
+    }
+    return;
+}
+
 int socket_server()
 {
     //调用socket函数返回的文件描述符
@@ -83,9 +106,8 @@ int socket_server()
     int addr_len = sizeof(clientAddr);
 
     int client;
-
-    char sendbuf[200];
     char recvbuf[200];
+    char sendbuf[200];
 
 
     //socket函数，失败返回-1
@@ -169,12 +191,24 @@ int socket_server()
                 register_process(client);
                 break;
             }
-            printf("%s\n", recvbuf);
-            printf("发送消息:");
+            //check mail list
+            else if(strcmp(recvbuf,"getmlist")==0)
+            {
+                recvlist_process(client);
+            }
+            //send mail
+            else if(strcmp(recvbuf,"")==0)
+            {
 
-            scanf("%s", recvbuf);
-            printf("\n");
-            send(client, recvbuf, strlen(recvbuf), 0);
+            }
+            //send file
+            else if(strcmp(recvbuf,"")==0)
+            {
+
+            }
+
+            strcpy(sendbuf,CONNECT_CLOSE);
+            send(client,sendbuf,sizeof(sendbuf),0);
         }
 
     }
@@ -298,6 +332,64 @@ int register_process(int client)
 
 }
 
+int recvlist_process(int client)
+{
+    char sendbuf[200];
+    char recvbuf[200];
+
+    strcpy(sendbuf,"okforlist");
+    printf("send:%s\n",sendbuf);
+    send(client, sendbuf, strlen(sendbuf), 0);
+
+    //wait for username;
+    wait_for_recv(client,recvbuf);
+
+    if(strcmp(recvbuf,CONNECT_CLOSE)==0)
+    {
+        return -1;
+    }
+    if(check_username(recvbuf))
+    {
+        char username[200];
+        strcpy(username,recvbuf);
+        strcpy(sendbuf,"userexists;");
+        //cal the mailnum in the list
+        std::vector<std::string> maillist = get_maillist(recvbuf);
+        char mailnum_str[50];
+        //mailnum<0 means error
+
+        int_to_string(mailnum_str,maillist.size());
+        strcat(sendbuf,mailnum_str);
+
+        printf("send:%s\n",sendbuf);
+        send(client, sendbuf, strlen(sendbuf), 0);
+
+        //wait for checksignal;
+        wait_for_recv(client,recvbuf);
+        if(strcmp(recvbuf,CONNECT_CLOSE)==0)
+        {
+            return -1;
+        }
+
+        for(int i=0;i<maillist.size();i++)
+        {
+            strcpy(sendbuf,maillist[i].c_str());
+            send(client,sendbuf,strlen(sendbuf),0);
+            wait_for_recv(client,recvbuf);
+            if(strcmp(recvbuf,CONNECT_CLOSE)==0)
+            {
+                return -1;
+            }
+        }
+        return 0;
+    }
+    else
+    {
+        printf("Username Error!\n");
+        return -2;
+    }
+    return 0;
+}
 
 int check_username(char* username){
     //连接数据库
@@ -307,7 +399,7 @@ int check_username(char* username){
     int check_status = check_username(query,username);
     db.close();
 
-    return check_status;
+    return check_status==CHECKED;
 }
 
 int check_password(char* username,char* password){
@@ -318,7 +410,7 @@ int check_password(char* username,char* password){
     int check_status = check_password(query,username,password);
     db.close();
 
-    return check_status;
+    return check_status==CHECKED;
 }
 
 int user_register(char* username,char* password){
@@ -329,7 +421,7 @@ int user_register(char* username,char* password){
     int check_status = user_register(query, username, password);
     db.close();
 
-    return check_status;
+    return check_status==CHECKED;
 }
 
 int upload_mail(char* sendername, char* receivername, char* title, char* text){
@@ -340,5 +432,5 @@ int upload_mail(char* sendername, char* receivername, char* title, char* text){
     int check_status = send_mail(query, receivername,sendername, title, text);
     db.close();
 
-    return check_status;
+    return check_status==CHECKED;
 }
