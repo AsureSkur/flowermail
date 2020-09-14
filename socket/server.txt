@@ -35,6 +35,7 @@ int upload_mail(char* sendername, char* receivername, char* title, char* text);
 
 //get the mailnum, mailtitle, sendername in the user's mailbox, return vector;
 std::vector<std::string> get_maillist(char* username);
+//get text by mailid, return string;
 std::string get_mailtext(char* mailid);
 
 int wait_for_recv(int client,char* recvbuf);
@@ -460,4 +461,15 @@ std::vector<std::string> get_maillist(char* username){
   std::vector<std::string> vec = get_mail_and_sender_by_receiver(query, tempquery, username);
   db.close();
   return vec;
+}
+
+std::string get_mailtext(char* mailid){
+    //连接数据库
+  QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
+  QSqlQuery query(db);
+
+  QString text = get_mail_text_by_mid(query, mailid);
+  db.close();
+
+  return text.toStdString();
 }
