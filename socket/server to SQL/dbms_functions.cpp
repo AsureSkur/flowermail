@@ -4,11 +4,12 @@
 #include <QStringList>
 #include <QSqlQuery>
 #include <time.h>
-#include <string>
+#include <cstring>
 #include <QFile>
 #include <QDir>
+#include <vector>
 /*
-    ！！！！！！！！！！！！！！！！！！！！！！！！看一眼line 470！！！！！！！！！！！！！！！！！！！！！！
+ *  看一眼line 474！！  与文件传输相关
     调用函数前需要创建一个db实例与query实例
     调用函数时第一个参数为query实例
     例子:
@@ -81,6 +82,7 @@
 #define ALREADY_EXIST -2    //用户已存在(用于注册判断)
 #define CANT_ADD_FILE_ADDR -3 //无法添加文件路径进数据库
 #define CANT_FIND_FILE -4   //在查找文件时找寻不到
+#define CONNECTION_FAILD 404  //连接不到数据库
 //#define
 
 //表类型
@@ -134,7 +136,7 @@ enum DraftValue { DID = 0,
 
     //数据查询
     QString dbms_get_data_from_user(QSqlQuery query, int column, QString Uname);//查询user表
-
+    QString dbms_get_uname_by_uid(QSqlQuery query, QString Uid);//通过uid查询用户名
         //查询后返回一个数据库表，需要使用 query.next() 与 query.value(int column) 得到字符串
     QSqlQuery dbms_get_query_from_mail_recipientid(QSqlQuery query, QString recipient_id);//根据收件人获得信件信息（用于查看信箱）
     QSqlQuery dbms_get_query_from_mail_senderid(QSqlQuery query, QString sender_id);//根据发件人获得信件信息（用于查看发送信件）
@@ -154,6 +156,8 @@ enum DraftValue { DID = 0,
 
     int  update_file_address(QSqlQuery query, QString Mid);                  //根据邮件id更改文件地址（插入时文件地址为null，如果有文件进行更新）
     void create_new_folder(QString storage, QString Mid);                   //传入存储地址与Mid，在该目录下创建一个文件夹
+
+    std::vector<std::string> get_mail_and_sender_by_receiver(QSqlQuery query,QSqlQuery tempquery, QString receiverid);  //获取收件人下 邮件id 邮件名 发件人名称
 
 //
 
@@ -362,7 +366,7 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
         else {
             query.next();
             QString data = query.value(0).toString();
-            qDebug() << "Successfully get data : " + data;
+            qDebug() << "Successfully get data from Uname : " + data;
             return data;
         }
     }
@@ -504,6 +508,36 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
         //插入数据库
         dbms_insert(query, QString::number(num,10), receiverid, senderid, title, text);
         return CHECKED;
+    }
+
+    QString dbms_get_uname_by_uid(QSqlQuery query, QString Uid){        //通过uid查询用户名
+        QString exec = "select Uname from User where Uid = " + Uid;
+        query.exec(exec);
+        query.next();
+        return query.value(0).toString();
+    }
+
+    //获取收件人下 邮件id 邮件名 发件人名称
+    std::vector<std::string> get_mail_and_sender_by_receiver(QSqlQuery query,QSqlQuery tempquery, QString receivername){
+
+        query.exec("select Uid from User where Uname = '" + receivername + "'");
+        query.next();
+        QString receiverid = query.value(0).toString();
+        query = dbms_get_query_from_mail_recipientid(query, receiverid);
+
+        std::vector<std::string> vec;
+        while(query.next()){
+            QString returnback;//插入vector的总语句
+            QString temp1 = query.value(MID).toString();        //MID
+            QString temp2 = query.value(MTITLE).toString();     //MTITLE
+            QString temp3 = query.value(MSENDERID).toString();  //SENDERID
+
+            temp3 = dbms_get_uname_by_uid(tempquery, temp3);
+            returnback = temp1 + ";" + temp2 + ";" + temp3;
+            //传入
+            vec.push_back(returnback.toStdString());
+        }
+        return vec;
     }
 
     /*
