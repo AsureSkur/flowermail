@@ -9,7 +9,7 @@
 #include <QDir>
 #include <vector>
 /*
- *  看一眼line 474！！  与文件传输相关
+ *  看一眼line 475！！  与文件传输相关
     调用函数前需要创建一个db实例与query实例
     调用函数时第一个参数为query实例
     例子:
@@ -78,7 +78,7 @@
 
 #define CHECKED 1   //返回信息
 #define CANT_FIND_USER 0   //找寻不到用户
-#define CANT_MATCH_PASSWORD 1 //密码不匹配
+#define CANT_MATCH_PASSWORD -1 //密码不匹配
 #define ALREADY_EXIST -2    //用户已存在(用于注册判断)
 #define CANT_ADD_FILE_ADDR -3 //无法添加文件路径进数据库
 #define CANT_FIND_FILE -4   //在查找文件时找寻不到
@@ -113,7 +113,7 @@ enum DraftValue { DID = 0,
 
 //函数
     //连接操作
-    QSqlDatabase connect_dbms(QString dbms, QString user,QString password);//数据库连接
+    QSqlDatabase connect_dbms(QString dbms, QString user, QString password);//数据库连接
 
     //数据插入操作
     void dbms_insert(QSqlQuery query, QString Uid, QString Uname, QString Upasswd);//数据插入表User
