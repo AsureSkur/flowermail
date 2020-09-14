@@ -33,7 +33,7 @@ int user_register(char* username,char* password);
 //upload mail to SQL, if upload succeed, return CHECKED, else return CANT_FIND_USER;
 int upload_mail(char* sendername, char* receivername, char* title, char* text);
 
-//return the mailnum in the user's mailbox, return int>=0, if error return -1;
+//get the mailnum, mailtitle, sendername in the user's mailbox, return vector;
 std::vector<std::string> get_maillist(char* username);
 
 int wait_for_recv(int client,char* recvbuf);
@@ -405,6 +405,7 @@ int check_username(char* username){
 int check_password(char* username,char* password){
     //连接数据库
     QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
+    if(db.isOpenError()) return CONNECTION_FAILD;
     QSqlQuery query(db);
 
     int check_status = check_password(query,username,password);
@@ -416,6 +417,7 @@ int check_password(char* username,char* password){
 int user_register(char* username,char* password){
     //连接数据库
     QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
+    if(db.isOpenError()) return CONNECTION_FAILD;
     QSqlQuery query(db);
 
     int check_status = user_register(query, username, password);
@@ -427,10 +429,22 @@ int user_register(char* username,char* password){
 int upload_mail(char* sendername, char* receivername, char* title, char* text){
       //连接数据库
     QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
+    if(db.isOpenError()) return CONNECTION_FAILD;
     QSqlQuery query(db);
 
     int check_status = send_mail(query, receivername,sendername, title, text);
     db.close();
 
     return check_status==CHECKED;
+}
+
+std::vector<std::string> get_maillist(char* username){
+    //连接数据库
+  QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
+  QSqlQuery query(db);
+  QSqlQuery tempquery(db);
+
+  std::vector<std::string> vec = get_mail_and_sender_by_receiver(query, tempquery, username);
+  db.close();
+  return vec;
 }
