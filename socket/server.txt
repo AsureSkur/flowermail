@@ -43,6 +43,7 @@ char* int_to_string(int num);
 int login_process(int client);
 int register_process(int client);
 int recvlist_process(int client);
+int sendmail_process(int client);
 
 int socket_server();
 
@@ -195,9 +196,16 @@ int socket_server()
             else if(strcmp(recvbuf,"getmlist")==0)
             {
                 recvlist_process(client);
+                break;
             }
             //send mail
-            else if(strcmp(recvbuf,"")==0)
+            else if(strcmp(recvbuf,"send mail")==0)
+            {
+                sendmail_process((client));
+                break;
+            }
+            //see mail detail
+            else if(strcmp(recvbuf,"seedetail")==0)
             {
 
             }
@@ -272,6 +280,7 @@ int login_process(int client)
     }
 
 }
+
 int register_process(int client)
 {
     char sendbuf[200];
@@ -387,6 +396,11 @@ int recvlist_process(int client)
         return -2;
     }
     return 0;
+}
+
+int sendmail_process(int client)
+{
+    return;
 }
 
 int check_username(char* username){
