@@ -35,9 +35,10 @@ int upload_mail(char* sendername, char* receivername, char* title, char* text);
 
 //get the mailnum, mailtitle, sendername in the user's mailbox, return vector;
 std::vector<std::string> get_maillist(char* username);
-//get text by mailid, return string;
+//get mail text by mailid, return string;
 std::string get_mailtext(char* mailid);
 
+int str_split(char* front,char* latter,char delim = ';');
 int wait_for_recv(int client,char* recvbuf);
 char* int_to_string(int num);
 
@@ -92,6 +93,23 @@ void int_to_string(char*str,int num)
         mod = mod / 10;
     }
     return;
+}
+
+int str_split(char* front,char* latter,char delim)
+{
+    char* p=front;
+    while((*p)!=delim&&(*p)!='\0')
+    {
+        p++;
+    }
+    if((*p)=='\0')
+    {
+        latter[0]='\0';
+        return -1;
+    }
+    strcpy(latter,p+1);
+    *p='\0';
+    return 0;
 }
 
 int socket_server()
@@ -201,7 +219,7 @@ int socket_server()
                 break;
             }
             //send mail
-            else if(strcmp(recvbuf,"send mail")==0)
+            else if(strcmp(recvbuf,"sendmail")==0)
             {
                 sendmail_process((client));
                 break;
@@ -402,7 +420,75 @@ int recvlist_process(int client)
 
 int sendmail_process(int client)
 {
-    return;
+    char sendbuf[200];
+    char recvbuf[1000];
+
+    strcpy(sendbuf,"okformailsend");
+    printf("send:%s\n",sendbuf);
+    send(client, sendbuf, strlen(sendbuf), 0);
+
+    //wait for username;
+    wait_for_recv(client,recvbuf);
+
+    if(strcmp(recvbuf,CONNECT_CLOSE)==0)
+    {
+        return -1;
+    }
+
+    //"withfile/nofile";sender;recver;title;maintext
+    char sender[1000],recver[1000],title[1000],maintext[1000];
+    str_split(recvbuf,sender,';');
+    str_split(sender,recver);
+    str_split(recver,title,';');
+    str_split(title,maintext,';');
+    //--------------------------------------------
+    if(check_username(sender)&&check_username(recver))
+    {
+        /*
+         * create database link, write message into database
+         */
+        //file
+        if(strcmp(recvbuf,"withfile")==0)
+        {
+            //a func for file deliver
+
+        }
+        strcpy(sendbuf,"sendmailsuccess");
+        printf("send:%s\n",sendbuf);
+        send(client,sendbuf,strlen(sendbuf),0);
+    }
+    else
+    {
+        strcpy(sendbuf,"usernameerror");
+        printf("send:%s\n",sendbuf);
+        send(client,sendbuf,strlen(sendbuf),0);
+        return -1;
+    }
+    return 0;
+}
+
+int seemailtext_process(int client)
+{
+    char sendbuf[1000];
+    char recvbuf[200];
+
+    strcpy(sendbuf,"okformailtext");
+    printf("send:%s\n",sendbuf);
+    send(client, sendbuf, strlen(sendbuf), 0);
+
+    //wait for mailid;username
+    wait_for_recv(client,recvbuf);
+    if(strcmp(recvbuf,CONNECT_CLOSE)==0)
+    {
+        return -1;
+    }
+    char mailid[200],recver[200];
+    /*
+     * string text=get_mailtext(char*mailid,char*recver)
+     */
+    send(client, sendbuf, strlen(sendbuf), 0);
+    return 0;
+
 }
 
 int check_username(char* username){
@@ -461,15 +547,4 @@ std::vector<std::string> get_maillist(char* username){
   std::vector<std::string> vec = get_mail_and_sender_by_receiver(query, tempquery, username);
   db.close();
   return vec;
-}
-
-std::string get_mailtext(char* mailid){
-    //连接数据库
-  QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
-  QSqlQuery query(db);
-
-  QString text = get_mail_text_by_mid(query, mailid);
-  db.close();
-
-  return text.toStdString();
 }
