@@ -1,0 +1,465 @@
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <vector>
+#include<QStringList>
+
+#define SERVER_PORT 6666
+#define SERVER_ADDR "192.168.43.146"
+#define CONNECT_CLOSE "end"
+/*
+连接到服务器后，会不停循环，等待输入，
+输入quit后，断开与服务器的连接
+*/
+//using namespace std;
+int socket_login(char *username,char *password);
+int socket_register(char *username,char *password);
+int socket_menurecv(char *username);
+int socket_sendmail(char *sendstr, char *filepath);
+int socket_mailtext(char *username,char *mailid);
+
+//two func in order to simplify the code
+int wait_for_recv(int client,char* recvbuf);
+int str_for_send(int client,const char* str);
+
+//a func which can slipt a string apart with a delimiter
+int str_split(char* front,char* latter,char delim = ';');
+int string_to_int(char* str);
+
+int main()
+{
+    printf("result:%d\n",socket_login("aaa","123"));
+    printf("result:%d\n",socket_register("bbb","123"));
+}
+
+//a function repeated wait for recv string from server
+int wait_for_recv(int client,char* recvbuf)
+{
+    int idatanum;
+    while(1)
+    {
+        recvbuf[0] = '\0';
+        idatanum = recv(client, recvbuf, 1024, 0);
+        if (idatanum < 0)
+        {
+            perror("recv null");
+            continue;
+        }
+        recvbuf[idatanum] = '\0';
+        printf("recv:%s\n",recvbuf);
+        break;
+    }
+    return 0;
+}
+
+int string_to_int(char* str)
+{
+    int res=0;
+    char*p=str;
+    while(*p!='\0')
+    {
+        res*=10;
+        res+=*p-'0';
+        p++;
+    }
+    return res;
+}
+
+int str_for_send(int client,const char* str)
+{
+    char sendbuf[200];
+    strcpy(sendbuf,str);
+    printf("%s\n",sendbuf);
+    send(client,sendbuf,sizeof(sendbuf),0);
+    return 0;
+}
+int str_split(char* front,char* latter,char delim)
+{
+    char* p=front;
+    while((*p)!=delim&&(*p)!='\0')
+    {
+        p++;
+    }
+    if((*p)=='\0')
+    {
+        latter[0]='\0';
+        return -1;
+    }
+    strcpy(latter,p+1);
+    *p='\0';
+    return 0;
+}
+//socket used for logining in, send username and password
+int socket_login(char username[200],char password[200])
+{
+    //客户端只需要一个套接字文件描述符，用于和服务器通信
+    int client;
+
+    //描述服务器的socket
+    struct sockaddr_in serverAddr;
+    char sendbuf[200];
+    char recvbuf[200];
+
+    if ((client = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("socket");
+        return -1;
+    }
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(SERVER_PORT);
+
+    //指定服务器端的ip，本地测试：127.0.0.1
+    //inet_addr()函数，将点分十进制IP转换成网络字节序IP
+    serverAddr.sin_addr.s_addr = inet_addr(SERVER_ADDR);
+    if (connect(client, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0)
+    {
+        perror("connect");
+        return -1;
+    }
+
+    printf("连接到主机...\n");
+
+    //ask for login in, if get recv "ok", go next
+    strcpy(sendbuf,"login");
+    printf("send:%s\n",sendbuf);
+    send(client, sendbuf, strlen(sendbuf), 0);
+
+    wait_for_recv(client,recvbuf);
+
+    if(strcmp(recvbuf,"okforlogin")!=0)
+    {
+        strcpy(sendbuf,CONNECT_CLOSE);
+        send(client, sendbuf, strlen(sendbuf), 0);
+        printf("Login failed!\n");
+        close(client);
+        return 1;
+    }
+
+    //send username, if username exists, go next
+
+    strcpy(sendbuf,username);
+    send(client, sendbuf, strlen(sendbuf), 0);
+
+    wait_for_recv(client,recvbuf);
+    if(strcmp(recvbuf,"userexists")!=0)
+    {
+        strcpy(sendbuf,CONNECT_CLOSE);
+        send(client, sendbuf, strlen(sendbuf), 0);
+        close(client);
+        printf("Username not exists!\n");
+        close(client);
+        return 2;
+    }
+
+    //send password, if password verified, go next
+    strcpy(sendbuf,password);
+    send(client, sendbuf, strlen(sendbuf), 0);
+
+    wait_for_recv(client,recvbuf);
+
+    //set return signal
+    strcpy(sendbuf,CONNECT_CLOSE);
+    send(client, sendbuf, strlen(sendbuf), 0);
+    close(client);
+
+    if(strcmp(recvbuf,"passwordright")!=0)
+    {
+        printf("Password wrong!\n");
+        return 3;
+    }
+    printf("Succeessfully login in!\n");
+    return 0;
+}
+
+//socket used for register, send username and password,
+//if username repeated show "repeated" and return 2,
+//if succeed return 0,
+//if something error, return -1; if connection failed halfway, return 1;
+//if no input(username or password is null), return 3;
+int socket_register(char username[200],char password[200])
+{
+    if(strlen(username)<=0||strlen(password)<=0)
+    {
+        printf("No input!\n");
+        return 3;
+    }
+    //客户端只需要一个套接字文件描述符，用于和服务器通信
+    int client;
+
+    //描述服务器的socket
+    struct sockaddr_in serverAddr;
+    char sendbuf[200];
+    char recvbuf[200];
+
+    if ((client = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("socket");
+        return -1;
+    }
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(SERVER_PORT);
+
+    //指定服务器端的ip，本地测试：127.0.0.1
+    //inet_addr()函数，将点分十进制IP转换成网络字节序IP
+    serverAddr.sin_addr.s_addr = inet_addr(SERVER_ADDR);
+    if (connect(client, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0)
+    {
+        perror("connect");
+        return -1;
+    }
+
+    printf("连接到主机...\n");
+    strcpy(sendbuf,"register");
+    send(client, sendbuf, strlen(sendbuf), 0);
+
+    wait_for_recv(client,recvbuf);
+    if(strcmp(recvbuf,"okforregister")!=0)
+    {
+        strcpy(sendbuf,CONNECT_CLOSE);
+        send(client, sendbuf, strlen(sendbuf), 0);
+        close(client);
+        printf("Register failed!\n");
+        close(client);
+        return 1;
+    }
+    //send username for register to the server
+    strcpy(sendbuf,username);
+    send(client, sendbuf, strlen(sendbuf), 0);
+
+    wait_for_recv(client,recvbuf);
+    if(strcmp(recvbuf,"usernameavailble")!=0)
+    {
+        strcpy(sendbuf,CONNECT_CLOSE);
+        send(client, sendbuf, strlen(sendbuf), 0);
+        close(client);
+        printf("Username has existed!\n");
+        close(client);
+        return 2;
+    }
+    //send password for register to the server
+    strcpy(sendbuf,password);
+    send(client, sendbuf, strlen(sendbuf), 0);
+    wait_for_recv(client,recvbuf);
+    if(strcmp(recvbuf,"registersucceed")!=0)
+    {
+        strcpy(sendbuf,CONNECT_CLOSE);
+        send(client, sendbuf, strlen(sendbuf), 0);
+        close(client);
+        printf("Register failed!\n");
+        close(client);
+        return 1;
+    }
+    printf("Register succeed!\n");
+    close(client);
+    return 0;
+}
+
+int socket_menurecv(char username[200])
+{
+    int client;
+
+    //描述服务器的socket
+    struct sockaddr_in serverAddr;
+
+    if ((client = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("socket");
+        return -1;
+    }
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(SERVER_PORT);
+
+    //指定服务器端的ip，本地测试：127.0.0.1
+    //inet_addr()函数，将点分十进制IP转换成网络字节序IP
+    serverAddr.sin_addr.s_addr = inet_addr(SERVER_ADDR);
+    if (connect(client, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0)
+    {
+        perror("connect");
+        return -1;
+    }
+
+    printf("连接到主机...\n");
+    char sendbuf[200];
+    char recvbuf[200];
+
+    //strcpy(sendbuf,"getmaillist");
+    //printf("send:%s\n",sendbuf);
+    //send(client, sendbuf, strlen(sendbuf), 0);
+    //"str_for_send(client,"getmaillist");"equal to the code above
+    str_for_send(client,"getmlist");
+    wait_for_recv(client,recvbuf);
+
+    if(strcmp(recvbuf,"okforlist")!=0)
+    {
+        str_for_send(client,CONNECT_CLOSE);
+        printf("Getting list failed!\n");
+        close(client);
+        return 1;
+    }
+    str_for_send(client,username);
+    wait_for_recv(client,recvbuf);
+    //record the total mail num
+    char mailnum[200];
+    int num=string_to_int(mailnum);
+    str_split(recvbuf,mailnum,';');
+    if(strcmp(recvbuf,"userexists")!=0)
+    {
+        str_for_send(client,CONNECT_CLOSE);
+        printf("Illegal visit!\n");
+        close(client);
+        return 1;
+    }
+    str_for_send(client,"readyforlist");
+    std::vector<QString>maillist;
+    for(int i=0;i<num;i++)
+    {
+        wait_for_recv(client,recvbuf);
+        if(strcmp(recvbuf,CONNECT_CLOSE)==0)
+        {
+            printf("Server Stop Error!\n");
+            close(client);
+            return -1;
+        }
+        maillist.push_back(QString(recvbuf));
+        str_for_send(client,"getlist");
+
+    }
+
+
+    /*
+     * a func show qstring in vector to the ui
+     *
+     *
+    */
+    close(client);
+    return 0;
+}
+//"withfile/nofile";sender;recver;title;maintext
+//error info temperarily be set -1, success return 0
+int socket_sendmail(char* sendstr,char* filepath)
+{
+    int client;
+
+    //描述服务器的socket
+    struct sockaddr_in serverAddr;
+
+    if ((client = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("socket");
+        return -1;
+    }
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(SERVER_PORT);
+
+    //指定服务器端的ip，本地测试：127.0.0.1
+    //inet_addr()函数，将点分十进制IP转换成网络字节序IP
+    serverAddr.sin_addr.s_addr = inet_addr(SERVER_ADDR);
+    if (connect(client, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0)
+    {
+        perror("connect");
+        return -1;
+    }
+
+    printf("连接到主机...\n");
+    char sendbuf[1000];
+    char recvbuf[200];
+
+    str_for_send(client,"sendmail");
+    wait_for_recv(client,recvbuf);
+    if(strcmp(recvbuf,CONNECT_CLOSE)==0)
+    {
+        close(client);
+        return -1;
+    }
+    if(filepath==NULL)
+    {
+        strcpy(sendbuf,"nofile;");
+        strcat(sendbuf,sendstr);
+    }
+    else
+    {
+        /*
+         *  a func for send file
+         */
+    }
+
+    wait_for_recv(client,recvbuf);
+    if(strcmp(recvbuf,"sendmailsuccess"))
+    {
+        close(client);
+        return 0;
+    }
+    else
+    {
+        close(client);
+        return -1;
+    }
+}
+
+int socket_mailtext(char *username, char *mailid)
+{
+    int client;
+
+    //描述服务器的socket
+    struct sockaddr_in serverAddr;
+
+    if ((client = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    {
+        perror("socket");
+        return -1;
+    }
+
+    serverAddr.sin_family = AF_INET;
+    serverAddr.sin_port = htons(SERVER_PORT);
+
+    //指定服务器端的ip，本地测试：127.0.0.1
+    //inet_addr()函数，将点分十进制IP转换成网络字节序IP
+    serverAddr.sin_addr.s_addr = inet_addr(SERVER_ADDR);
+    if (connect(client, (struct sockaddr *) &serverAddr, sizeof(serverAddr)) < 0)
+    {
+        perror("connect");
+        return -1;
+    }
+
+    printf("连接到主机...\n");
+    char sendbuf[200];
+    char recvbuf[1000];
+
+    str_for_send(client,"getmailtext");
+    wait_for_recv(client,recvbuf);
+    if(strcmp(recvbuf,CONNECT_CLOSE)==0)
+    {
+        close(client);
+        return -1;
+    }
+    strcpy(sendbuf,mailid);
+    strcat(sendbuf,";");
+    strcat(sendbuf,username);
+    send(client,sendbuf,sizeof(sendbuf),0);
+
+    wait_for_recv(client,recvbuf);
+    if(strcmp(recvbuf,CONNECT_CLOSE)==0)
+    {
+        close(client);
+        return -1;
+    }
+    /*
+     * show text in the ui
+     */
+    close(client);
+    return 0;
+}
+
