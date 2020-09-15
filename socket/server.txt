@@ -37,6 +37,7 @@ int upload_mail(char* sendername, char* receivername, char* title, char* text);
 std::vector<std::string> get_maillist(char* username);
 //get mail text by mailid, return string;
 std::string get_mailtext(char* mailid);
+char* upload_mail_to_dbms(char* sender,char*recver,char* title, char* text);
 
 int str_split(char* front,char* latter,char delim = ';');
 int wait_for_recv(int client,char* recvbuf);
@@ -448,6 +449,7 @@ int sendmail_process(int client)
          * create database link, write message into database
          */
         //file
+        upload_mail_to_dbms(sender,recver,title, maintext);
         if(strcmp(recvbuf,"withfile")==0)
         {
             //a func for file deliver
@@ -482,10 +484,10 @@ int seemailtext_process(int client)
     {
         return -1;
     }
-    char mailid[200],recver[200];
-    /*
-     * string text=get_mailtext(char*mailid,char*recver)
-     */
+    char mailid[200];
+
+    string text=get_mailtext(char*mailid)
+
     send(client, sendbuf, strlen(sendbuf), 0);
     return 0;
 
@@ -547,4 +549,14 @@ std::vector<std::string> get_maillist(char* username){
   std::vector<std::string> vec = get_mail_and_sender_by_receiver(query, tempquery, username);
   db.close();
   return vec;
+}
+std::string get_mailtext(char* mailid){
+    //连接数据库
+  QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
+  QSqlQuery query(db);
+
+  QString text = get_mail_text_by_mid(query, mailid);
+  db.close();
+
+  return text.toStdString();
 }
