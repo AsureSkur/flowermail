@@ -15,13 +15,10 @@
     例子:
     QSqlDatabase db = connect_dbms("flowermail", "root", "123456");
     QSqlQuery query(db);
-
     在完成某个操作之后需要进行数据库关闭
     例子:
     db.close();
-
     建议在打开信箱之后将数据保存在全局变量中
-
     宏、枚举、函数从 下方开始  均有注释说明功能
 */
 
@@ -56,7 +53,7 @@
            "");*/
     /*
      * 手动补:alter table Mail modify column Mrecipientid int not null;
-     *      :alter table Mail modify column Msenderid int nut null;
+     *      :alter table Mail modify column Msenderid int not null;
             */
 //创建草稿箱 完成
     /*query.exec("create table Draft"
@@ -132,7 +129,7 @@ enum DraftValue { DID = 0,
     //数据删除
         //应该只有删邮件？？
         //type:表类型(0:User,1:Mail,2:Draft) condition:删除约束条件(sql语句中Where后面的部分)
-    void dbms_delete(QSqlQuery query, QString Mid, int tabletype);           //删除数据表中的某个内容
+    QString dbms_delete(QSqlQuery query, QString Mid, int tabletype);           //删除数据表中的某个内容
 
     //数据查询
     QString dbms_get_data_from_user(QSqlQuery query, int column, QString Uname);//查询user表
@@ -140,6 +137,7 @@ enum DraftValue { DID = 0,
         //查询后返回一个数据库表，需要使用 query.next() 与 query.value(int column) 得到字符串
     QSqlQuery dbms_get_query_from_mail_recipientid(QSqlQuery query, QString recipient_id);//根据收件人获得信件信息（用于查看信箱）
     QSqlQuery dbms_get_query_from_mail_senderid(QSqlQuery query, QString sender_id);//根据发件人获得信件信息（用于查看发送信件）
+    QString dbms_get_receiverid_by_mid(QSqlQuery query, QString mid);
 
     QString dbms_get_file_addr(QSqlQuery query, QString Mid);//获取文件储存地址
 
@@ -169,8 +167,8 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
     // 输出可用数据库
     qDebug() << "Available drivers:";
     QStringList drivers = QSqlDatabase::drivers();
-    foreach(QString driver, drivers)
-        qDebug() << driver;
+    //foreach(QString driver, drivers)
+        //qDebug() << driver;
 
     // 打开MySQL
     QSqlDatabase db = QSqlDatabase::addDatabase(CONNECTION);
@@ -327,7 +325,7 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
     //数据删除
         //应该只有删邮件？？
         //type:表类型(0:User,1:Mail,2:Draft) condition:删除约束条件(sql语句中Where后面的部分)(应该只有Mid为条件)
-    void dbms_delete(QSqlQuery query, QString Mid, int tabletype){           //删除数据表中的某个内容
+    QString dbms_delete(QSqlQuery query, QString Mid, int tabletype){           //删除数据表中的某个内容
             QString exec;
             switch (tabletype) {
                 case USER:
@@ -340,8 +338,11 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
                 default: break;
             }
 
-            if(query.exec(exec)) qDebug() << "Successfully delete mail";
-            else                 qDebug() << "Fail to delete mail";
+            QString status;
+            if(query.exec(exec)) status="deletesuccess";
+            else                 status="deletefail";
+
+            return status;
         }
 
     QString dbms_get_data_from_user(QSqlQuery query, int column, QString Uname){       //查询user表
@@ -382,6 +383,12 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
         QString exec = "select * from Mail where Msenderid = " + sender_id;
         query.exec(exec);
         return query;
+    }
+    QString dbms_get_receiverid_by_mid(QSqlQuery query, QString mid){
+        QString exec = "select Mrecipientid from Mail where Mid = " + mid;
+        query.exec(exec);
+        query.next();
+        return query.value(0).toString();
     }
 
 
@@ -503,9 +510,8 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
         QString exec = "select Mid from Mail";
         query.exec(exec);
         int num = 0;
-        while(query.next()){
-            num++;
-        }
+        query.next();
+        num = query.value(0).toInt();
         //插入数据库
         dbms_insert(query, QString::number(num,10), receiverid, senderid, title, text);
         return CHECKED;
