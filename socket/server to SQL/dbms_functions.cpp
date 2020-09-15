@@ -114,7 +114,7 @@ enum DraftValue { DID = 0,
 
     //数据插入操作
     void dbms_insert(QSqlQuery query, QString Uid, QString Uname, QString Upasswd);//数据插入表User
-    void dbms_insert(QSqlQuery query, QString Mid, QString Mrecipientid,           //数据插入表Mail
+    int dbms_insert(QSqlQuery query, QString Mid, QString Mrecipientid,           //数据插入表Mail
                      QString Msenderid, QString Mtitle, QString Mtext,
                      QString Mfile, QString Misinjunkbox, QString Misread);
     void dbms_insert(QSqlQuery query, QString Did, QString Dtext);                 //数据插入表Draft
@@ -251,14 +251,14 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
         if(query.exec(exec)) qDebug() << "Successfully insert data into Mail";
         else                 qDebug() << "Fail to insert data";
     }
-    void dbms_insert(QSqlQuery query, QString Did, QString Dtext){
+    int dbms_insert(QSqlQuery query, QString Did, QString Dtext){
         //组合命令
         QString exec = "insert into Draft values("
                         + Did + ","
                         + "'" + Dtext + "')";
         //判断是否写入成功
-        if(query.exec(exec)) qDebug() << "Successfully insert data into Draft";
-        else                 qDebug() << "Fail to insert data";
+        if(query.exec(exec)) return 0;
+        else                 return -1;
     }
 
     //alter:更新内容  tabletype:表类型(0:User, 2:Draft)
@@ -507,14 +507,14 @@ QSqlDatabase connect_dbms(QString dbms, QString user,QString password){
         QString senderid = dbms_get_data_from_user(query, UID, sender);
         QString receiverid = dbms_get_data_from_user(query, UID, receiver);
         //自动生成Mid
-        QString exec = "select Mid from Mail";
+        QString exec = "select Mid from Mail order by Mid desc";
         query.exec(exec);
         int num = 0;
         query.next();
-        num = query.value(0).toInt();
+        num = query.value(0).toInt() + 1;
         //插入数据库
-        dbms_insert(query, QString::number(num,10), receiverid, senderid, title, text);
-        return CHECKED;
+        
+        return dbms_insert(query, QString::number(num,10), receiverid, senderid, title, text);
     }
 
     QString dbms_get_uname_by_uid(QSqlQuery query, QString Uid){        //通过uid查询用户名
