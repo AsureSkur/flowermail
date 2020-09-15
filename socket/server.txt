@@ -16,7 +16,7 @@
 
 #define SERVER_PORT 6666
 #define CONNECT_CLOSE "end"
-#define DBMS_PWD "123456"
+#define DBMS_PWD "King5dom9"
 
 //using namespace std;
 
@@ -36,8 +36,10 @@ int upload_mail(char* sendername, char* receivername, char* title, char* text);
 //get the mailnum, mailtitle, sendername in the user's mailbox, return vector;
 std::vector<std::string> get_maillist(char* username);
 //get mail text by mailid, return string;
-std::string get_mailtext(char* mailid);
-//upload mail to DBMS, return Mid;
+std::string get_mailtext(char* mailid,char* username);
+std::string get_maildelete(char* mailid,char* username);
+
+//a func write data into dbms, if succeed return mailid, else return null
 char* upload_mail_to_dbms(char* sender,char*recver,char* title, char* text);
 
 int str_split(char* front,char* latter,char delim = ';');
@@ -49,6 +51,8 @@ int login_process(int client);
 int register_process(int client);
 int recvlist_process(int client);
 int sendmail_process(int client);
+int seemailtext_process(int client);
+int deletemail_process(int client);
 
 int socket_server();
 
@@ -223,18 +227,18 @@ int socket_server()
             //send mail
             else if(strcmp(recvbuf,"sendmail")==0)
             {
-                sendmail_process((client));
+                sendmail_process(client);
                 break;
             }
-            //see mail detail
-            else if(strcmp(recvbuf,"seedetail")==0)
+            else if(strcmp(recvbuf,"getmailtext")==0)
             {
-
+                seemailtext_process(client);
+                break;
             }
-            //send file
-            else if(strcmp(recvbuf,"")==0)
+            else if(strcmp(recvbuf,"deletemail")==0)
             {
-
+                deletemail_process(client);
+                break;
             }
         }
         strcpy(sendbuf,CONNECT_CLOSE);
@@ -403,6 +407,7 @@ int recvlist_process(int client)
         for(int i=0;i<maillist.size();i++)
         {
             strcpy(sendbuf,maillist[i].c_str());
+            printf("send:%s\n",sendbuf);
             send(client,sendbuf,strlen(sendbuf),0);
             wait_for_recv(client,recvbuf);
             if(strcmp(recvbuf,CONNECT_CLOSE)==0)
@@ -450,7 +455,9 @@ int sendmail_process(int client)
          * create database link, write message into database
          */
         //file
+
         upload_mail_to_dbms(sender,recver,title, maintext);
+
         if(strcmp(recvbuf,"withfile")==0)
         {
             //a func for file deliver
@@ -485,12 +492,41 @@ int seemailtext_process(int client)
     {
         return -1;
     }
-    char mailid[200];
-    std::string text = get_mailtext(mailid);
-
+    char mailid[200],recver[200];
+    str_split(recvbuf,recver);
+    strcpy(mailid,recvbuf);
+    printf("mailid:%s,recver:%s\n",mailid,recver);
+    std::string text=get_mailtext(mailid,recver);
+    strcpy(sendbuf,text.c_str());
     send(client, sendbuf, strlen(sendbuf), 0);
+    printf("send:%s\n",sendbuf);
     return 0;
+}
 
+int deletemail_process(int client)
+{
+    char sendbuf[200];
+    char recvbuf[200];
+
+    strcpy(sendbuf,"okfordelete");
+    printf("send:%s\n",sendbuf);
+    send(client, sendbuf, strlen(sendbuf), 0);
+
+    //wait for mailid;username
+    wait_for_recv(client,recvbuf);
+    if(strcmp(recvbuf,CONNECT_CLOSE)==0)
+    {
+        return -1;
+    }
+    char mailid[200],recver[200];
+    str_split(recvbuf,recver);
+    strcpy(mailid,recvbuf);
+    printf("mailid:%s,recver:%s\n",mailid,recver);
+    std::string text=get_maildelete(mailid,recver);
+    strcpy(sendbuf,text.c_str());
+    send(client, sendbuf, strlen(sendbuf), 0);
+    printf("send:%s\n",sendbuf);
+    return 0;
 }
 
 int check_username(char* username){
@@ -550,12 +586,40 @@ std::vector<std::string> get_maillist(char* username){
   db.close();
   return vec;
 }
-std::string get_mailtext(char* mailid){
+
+std::string get_mailtext(char* mailid,char *username){
     //连接数据库
   QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
   QSqlQuery query(db);
+  QString uid = dbms_get_data_from_user(query, UID, username);
+  QString recverid = dbms_get_receiverid_by_mid(query, mailid);
+  if(uid!=recverid)
+  {
+      QString error="ERROR:You do not have such mail!";
+      db.close();
+      return error.toStdString();
+  }
 
   QString text = get_mail_text_by_mid(query, mailid);
+  db.close();
+
+  return text.toStdString();
+}
+
+std::string get_maildelete(char* mailid,char *username){
+    //连接数据库
+  QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
+  QSqlQuery query(db);
+  QString uid = dbms_get_data_from_user(query, UID, username);
+  QString recverid = dbms_get_receiverid_by_mid(query, mailid);
+  if(uid!=recverid)
+  {
+      QString error="ERROR:You do not have such mail!";
+      db.close();
+      return error.toStdString();
+  }
+
+  QString text = dbms_delete(query, mailid, MAIL);
   db.close();
 
   return text.toStdString();
