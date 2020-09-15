@@ -37,6 +37,7 @@ int upload_mail(char* sendername, char* receivername, char* title, char* text);
 std::vector<std::string> get_maillist(char* username);
 //get mail text by mailid, return string;
 std::string get_mailtext(char* mailid);
+//upload mail to DBMS, return Mid;
 char* upload_mail_to_dbms(char* sender,char*recver,char* title, char* text);
 
 int str_split(char* front,char* latter,char delim = ';');
@@ -485,8 +486,7 @@ int seemailtext_process(int client)
         return -1;
     }
     char mailid[200];
-
-    string text=get_mailtext(char*mailid)
+    std::string text = get_mailtext(mailid);
 
     send(client, sendbuf, strlen(sendbuf), 0);
     return 0;
@@ -559,4 +559,20 @@ std::string get_mailtext(char* mailid){
   db.close();
 
   return text.toStdString();
+}
+
+char* upload_mail_to_dbms(char* sender,char*recver,char* title, char* text){
+    //连接数据库
+    QSqlDatabase db = connect_dbms("flowermail", "root", DBMS_PWD);
+    QSqlQuery query(db);
+
+    int mid = send_mail(query, recver, sender, title, text);
+    QString Mid = QString::number(mid,10);
+
+    std::string midstr = Mid.toStdString();
+    char *data;
+    int len = midstr.length();
+    data = (char *)malloc((len+1)*sizeof(char));
+    midstr.copy(data,len,0);
+    return data;
 }
